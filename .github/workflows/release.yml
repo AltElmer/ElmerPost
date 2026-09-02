@@ -109,13 +109,35 @@ jobs:
         run: |
           set -e
           d="dist/elmerpost-${{ matrix.target }}/bin"
-          for exe in "$d"/ElmerPost.exe "$d"/sico2elmer.exe; do
-            [ -f "$exe" ] || continue
-            ldd "$exe" | awk '{print $3}' | grep -i "^/${{ matrix.msys-prefix }}/bin/" | while read -r dll; do
-              cp -n "$dll" "$d/" || true
+          mkdir -p "$d"
+          echo "bundling into $d"
+          ls -l "$d" || true
+
+          # objdump, not ldd. ldd lives in MSYS2's msys environment and this
+          # job installs only the packages it asks for, so ldd is absent: the
+          # step dies on its first command under set -e, before reaching any
+          # echo, and reports exit 1 with no output at all. That is exactly
+          # what happened to elmerfront's release. objdump comes with binutils
+          # alongside the compiler.
+          #
+          # Repeated until nothing new is copied, because the DLLs have
+          # dependencies of their own.
+          pass=0
+          while : ; do
+            pass=$((pass+1))
+            before=$(ls "$d"/*.dll 2>/dev/null | wc -l)
+            for bin in "$d"/*.exe "$d"/*.dll; do
+              [ -f "$bin" ] || continue
+              objdump -p "$bin" | awk '/DLL Name:/ {print $3}' | while read -r dll; do
+                [ -f "/${{ matrix.msys-prefix }}/bin/$dll" ] || continue
+                cp -n "/${{ matrix.msys-prefix }}/bin/$dll" "$d/" 2>/dev/null || true
+              done
             done
+            after=$(ls "$d"/*.dll 2>/dev/null | wc -l)
+            echo "pass $pass: $before -> $after DLLs"
+            [ "$after" -gt "$before" ] || break
+            [ "$pass" -lt 8 ] || break
           done
-          echo "bundled DLLs:"; ls "$d"/*.dll 2>/dev/null | wc -l
 
       - name: package
         shell: bash
