@@ -133,7 +133,7 @@ jobs:
           find "$d" -name 'init.tcl' | grep -q . \
             || { echo "::error::no tcl scripts in the archive; ElmerPost would start and do nothing"; exit 1; }
           echo "binary: $exe"
-          ls -lR "$d" | head -40
+          { ls -lR "$d" || true; } | head -40 || true
 
           cd dist
           if [ "${{ runner.os }}" = "Windows" ]; then

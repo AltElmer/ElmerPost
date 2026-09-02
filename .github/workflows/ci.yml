@@ -195,8 +195,18 @@ jobs:
             otool -L "$lib"
             exit 1
           fi
-          echo "CMAKE_PREFIX_PATH=$PREFIX:/opt/X11" >> "$GITHUB_ENV"
-          echo "TCL_ROOT=$PREFIX" >> "$GITHUB_ENV"
+          # Passed as explicit cache entries rather than through TCL_ROOT or
+          # CMAKE_PREFIX_PATH. This project's cmake_minimum_required is 3.10,
+          # so policy CMP0074 is unset and CMake says out loud that it is
+          # ignoring TCL_ROOT; FindTCL then finds Apple's Tcl.framework in the
+          # Xcode SDK and the X11 Tk built above is discarded at configure
+          # time, which is exactly what happened.
+          tcllib=$(ls "$PREFIX"/lib/libtcl8.6* | head -1)
+          tklib=$(ls "$PREFIX"/lib/libtk8.6* | head -1)
+          {
+            echo "MAC_TCLTK_ARGS=-DTCL_INCLUDE_PATH=$PREFIX/include -DTK_INCLUDE_PATH=$PREFIX/include -DTCL_LIBRARY=$tcllib -DTK_LIBRARY=$tklib -DTCL_TCLSH=$PREFIX/bin/tclsh8.6"
+            echo "MAC_TCLTK_PREFIX=$PREFIX"
+          } >> "$GITHUB_ENV"
 
       - name: build
         if: '!matrix.mingw'
@@ -206,7 +216,24 @@ jobs:
             set +u; . /opt/intel/oneapi/setvars.sh; set -u
           fi
           echo "cmake: $(cmake --version | head -1)"
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake-extra }}
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake-extra }} $MAC_TCLTK_ARGS
+
+          # On macOS, prove the configure used the X11 Tcl/Tk built for this
+          # job and not Apple's framework. Without this the job can succeed
+          # having quietly linked the Aqua Tk, which is the thing the whole
+          # XQuartz exercise exists to avoid, and nothing would say so.
+          if [ -n "$MAC_TCLTK_PREFIX" ]; then
+            used=$(grep -E '^(TCL|TK)_(LIBRARY|INCLUDE_PATH):' build/CMakeCache.txt || true)
+            echo "$used"
+            if echo "$used" | grep -qi 'framework'; then
+              echo "::error::configure picked Apple's Tcl/Tk framework, not the X11 build"
+              exit 1
+            fi
+            echo "$used" | grep -q "$MAC_TCLTK_PREFIX" \
+              || { echo "::error::Tcl/Tk did not come from $MAC_TCLTK_PREFIX"; exit 1; }
+            echo "ok: using the X11 Tcl/Tk from $MAC_TCLTK_PREFIX"
+          fi
+
           cmake --build build
 
       - name: build (mingw)
