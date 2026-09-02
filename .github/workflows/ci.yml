@@ -63,6 +63,23 @@ jobs:
               mingw-w64-clang-aarch64-tcl
               mingw-w64-clang-aarch64-tk
             fortran: false
+          # macOS, through XQuartz.
+          #
+          # ElmerPost's non-Windows path is an X11 program: it uses Display,
+          # Window and Visual directly to put a GL context inside a Tk window.
+          # macOS has no X11 of its own and Homebrew's Tcl/Tk is an Aqua build,
+          # so neither the window system nor the toolkit is there by default.
+          # Both are obtainable: XQuartz supplies X11 and a GLX capable libGL,
+          # and Tk builds against it with --enable-aqua=no. That is a cost in
+          # build time rather than a reason the platform cannot work.
+          - name: macos-arm64 (clang, xquartz)
+            os: macos-14
+            macos-x11: true
+            fortran: true
+          - name: macos-x86_64 (clang, xquartz)
+            os: macos-15-intel
+            macos-x11: true
+            fortran: true
 
     steps:
       - uses: actions/checkout@v4
@@ -104,6 +121,63 @@ jobs:
         with:
           msystem: ${{ matrix.msystem }}
           install: ${{ matrix.msys-packages }}
+
+      # Homebrew's Tcl/Tk is Aqua, and ElmerPost needs the X11 build, so Tk is
+      # compiled here against XQuartz. Cached, because it is the same result
+      # every time and a few minutes is worth paying once rather than per run.
+      - name: cache the X11 Tcl/Tk (macos)
+        if: matrix.macos-x11
+        id: tcltk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/tcltk-x11
+          key: tcltk-x11-8.6.14-${{ matrix.os }}-v1
+
+      - name: xquartz (macos)
+        if: matrix.macos-x11
+        run: |
+          brew install --cask xquartz
+          brew install gfortran || brew install gcc
+          test -f /opt/X11/include/X11/Xlib.h || { echo "::error::XQuartz did not provide X11 headers"; exit 1; }
+          ls /opt/X11/lib/libGL* || { echo "::error::XQuartz did not provide libGL"; exit 1; }
+          echo "XQuartz provides X11 and libGL"
+
+      - name: build an X11 Tcl/Tk (macos)
+        if: matrix.macos-x11 && steps.tcltk-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          V=8.6.14
+          PREFIX="$HOME/tcltk-x11"
+          mkdir -p "$RUNNER_TEMP/tcltk" && cd "$RUNNER_TEMP/tcltk"
+          curl -fsSL -o tcl.tar.gz "https://downloads.sourceforge.net/project/tcl/Tcl/$V/tcl$V-src.tar.gz"
+          curl -fsSL -o tk.tar.gz  "https://downloads.sourceforge.net/project/tcl/Tcl/$V/tk$V-src.tar.gz"
+          tar xzf tcl.tar.gz && tar xzf tk.tar.gz
+          ( cd "tcl$V/unix" && ./configure --prefix="$PREFIX" >/dev/null && make -j3 >/dev/null && make install >/dev/null )
+          # --enable-aqua=no is what makes this the X11 Tk rather than the
+          # native one Homebrew ships.
+          ( cd "tk$V/unix" && ./configure --prefix="$PREFIX" --with-tcl="$PREFIX/lib" \
+              --enable-aqua=no --x-includes=/opt/X11/include --x-libraries=/opt/X11/lib >/dev/null \
+            && make -j3 >/dev/null && make install >/dev/null )
+
+      # A Tk that silently came out Aqua would defeat the whole job, so check
+      # what was actually built rather than that the build succeeded.
+      - name: the Tk built must be the X11 one (macos)
+        if: matrix.macos-x11
+        run: |
+          set -e
+          PREFIX="$HOME/tcltk-x11"
+          test -f "$PREFIX/include/tk.h" || { echo "::error::no tk.h in $PREFIX"; exit 1; }
+          lib=$(ls "$PREFIX"/lib/libtk8.6* | head -1)
+          echo "tk library: $lib"
+          if otool -L "$lib" | grep -qi 'libX11'; then
+            echo "ok: Tk links libX11, so it is the X11 build"
+          else
+            echo "::error::Tk does not link libX11; it came out as the Aqua build"
+            otool -L "$lib"
+            exit 1
+          fi
+          echo "CMAKE_PREFIX_PATH=$PREFIX:/opt/X11" >> "$GITHUB_ENV"
+          echo "TCL_ROOT=$PREFIX" >> "$GITHUB_ENV"
 
       - name: build
         if: '!matrix.mingw'

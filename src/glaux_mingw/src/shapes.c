@@ -452,7 +452,7 @@ static GLdouble idata[12][3] = {
   {-Z, -X, 0}
 };
 
-static int index[20][3] = {
+static int icosa_index[20][3] = {
     {0, 4, 1},    {0, 9, 4},
     {9, 5, 4},    {4, 5, 8},
     {4, 8, 1},    {8, 10, 1},
@@ -554,9 +554,9 @@ static void drawtriangle(int i, int geomType, int depth,
 
     switch (geomType) {
         case 0: /* icosahedron */
-            x0 = &idata[index[i][0]][0];
-            x1 = &idata[index[i][1]][0];
-            x2 = &idata[index[i][2]][0];
+            x0 = &idata[icosa_index[i][0]][0];
+            x1 = &idata[icosa_index[i][1]][0];
+            x2 = &idata[icosa_index[i][2]][0];
             break;
         case 1: /* octahedron */
             x0 = &odata[ondex[i][0]][0];
