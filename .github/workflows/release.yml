@@ -254,10 +254,63 @@ jobs:
             tar czf "elmerpost-${{ matrix.target }}.tar.gz" "elmerpost-${{ matrix.target }}"
           fi
 
+      # A single self-contained .exe, alongside the archive.
+      #
+      # Tcl/Tk cannot be linked statically here: MSYS2 ships only import
+      # libraries and a stub, and this Tcl 8.6 has no zipfs to embed the
+      # script libraries with. So the program cannot be reduced to one file by
+      # linking. What it can be is one file to download and one file to
+      # double-click, which is what was actually asked for: the tree is
+      # compressed and appended to a launcher that unpacks it to a temporary
+      # directory and runs the program.
+      #
+      # 7zSD.sfx is the launcher. It comes from the LZMA SDK, not from the
+      # normal 7-Zip installation and not from 7-Zip Extra, whose current
+      # release no longer carries it: the 7z.sfx in a normal install is a
+      # plain extractor with no RunProgram support, and using it produces an
+      # "Extract to:" dialog instead of starting the program.
+      - name: build a single-file executable
+        if: matrix.mingw
+        shell: bash
+        run: |
+          set -e
+          name="ElmerPost"
+          d="dist/elmerpost-${{ matrix.target }}"
+          sdk="$RUNNER_TEMP/lzmasdk"
+          mkdir -p "$sdk"
+
+          curl -fsSL -o "$sdk/sdk.7z" https://www.7-zip.org/a/lzma2301.7z
+          7z x "$sdk/sdk.7z" -o"$sdk" -y > /dev/null
+          sfx=$(find "$sdk" -name '7zSD.sfx' | head -1)
+          [ -n "$sfx" ] || { echo "::error::7zSD.sfx not found in the LZMA SDK"; exit 1; }
+          echo "launcher: $sfx ($(stat -c%s "$sfx" 2>/dev/null || stat -f%z "$sfx") bytes)"
+
+          7z a -t7z -mx=9 "$RUNNER_TEMP/payload.7z" "./$d/*" > /dev/null
+
+          printf ';!@Install@!UTF-8!\nTitle="%s"\nRunProgram="bin\\\\%s.exe"\nGUIMode="2"\n;!@InstallEnd@!\n' \
+            "$name" "$name" > "$RUNNER_TEMP/sfx-config.txt"
+
+          mkdir -p dist
+          cat "$sfx" "$RUNNER_TEMP/sfx-config.txt" "$RUNNER_TEMP/payload.7z" \
+            > "dist/$name-${{ matrix.target }}.exe"
+
+          # The launcher on its own is about 125 kB, so a result that size
+          # means the payload never made it. Reading the archive back is the
+          # check that matters: 7z can list an SFX, and the program has to be
+          # in there.
+          sz=$(stat -c%s "dist/$name-${{ matrix.target }}.exe" 2>/dev/null || stat -f%z "dist/$name-${{ matrix.target }}.exe")
+          echo "single-file executable: $sz bytes"
+          [ "$sz" -gt 1000000 ] || { echo "::error::the single-file exe is too small to contain the payload"; exit 1; }
+          7z l "dist/$name-${{ matrix.target }}.exe" | grep -qi "$name.exe" \
+            || { echo "::error::the payload does not contain $name.exe"; exit 1; }
+          echo "ok: single-file executable carries the program"
+
       - uses: actions/upload-artifact@v4
         with:
           name: elmerpost-${{ matrix.target }}
-          path: dist/elmerpost-*.*
+          path: |
+            dist/elmerpost-*.*
+            dist/ElmerPost-*.exe
           if-no-files-found: error
 
   publish:
@@ -282,4 +335,6 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
-          files: dist/**/elmerpost-*.*
+          files: |
+            dist/**/elmerpost-*.*
+            dist/**/ElmerPost-*.exe
