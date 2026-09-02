@@ -77,6 +77,30 @@ CHECK_INCLUDE_FILES(string.h HAVE_STRING_H)
 #SET(TCLSH_VERSION_STRING 8.5)
 FIND_PACKAGE(TCL REQUIRED) # This finds Tk too
 FIND_PACKAGE(OpenGL REQUIRED)
+
+# Put OpenGL's headers on the include path.
+#
+# FIND_PACKAGE(OpenGL) sets OPENGL_INCLUDE_DIR and nothing here ever used it,
+# which works only where the GL headers are already in a default system
+# include path. That is true on Linux and not on macOS, where they come from
+# XQuartz under /opt/X11/include, so the build failed with
+#
+#   glaux/glaux.h:42:10: fatal error: 'GL/gl.h' file not found
+#
+# even with OPENGL_INCLUDE_DIR set correctly on the command line. Tcl and Tk
+# already have their include paths added in src/CMakeLists.txt; OpenGL did not.
+IF(OPENGL_INCLUDE_DIR)
+  INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIR})
+ENDIF()
+
+# Same for X11. ElmerPost includes <X11/Xlib.h> directly on every non-Windows
+# platform, and on macOS that header is not in a default include path either.
+IF(NOT WIN32)
+  FIND_PACKAGE(X11)
+  IF(X11_INCLUDE_DIR)
+    INCLUDE_DIRECTORIES(${X11_INCLUDE_DIR})
+  ENDIF()
+ENDIF()
 SET(USE_INTERP_RESULT TRUE)
 
 MESSAGE(STATUS "OPENGL_LIBRARIES = ${OPENGL_LIBRARIES}")
