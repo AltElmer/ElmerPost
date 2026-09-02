@@ -262,6 +262,11 @@ jobs:
 
   publish:
     needs: build
+    # always(), so a platform that fails does not withhold the platforms that
+    # worked. A release with four of six archives is useful; a release with
+    # none because one target broke is not. The publish step below fails if
+    # nothing at all was produced.
+    if: always()
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
