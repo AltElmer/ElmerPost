@@ -18,7 +18,12 @@ ENDIF(NOT(MINGW))
 add_subdirectory(camera)
 add_subdirectory(graphics)
 add_subdirectory(modules)
-add_subdirectory(sico2elmer)
+# sico2elmer is the only Fortran in the tree, and it is a converter rather than
+# part of the post-processor, so it is skipped when there is no Fortran
+# compiler instead of stopping the whole build.
+IF(ELMERPOST_FORTRAN)
+  add_subdirectory(sico2elmer)
+ENDIF()
 add_subdirectory(objects)
 add_subdirectory(visuals)
 add_subdirectory(tcl)

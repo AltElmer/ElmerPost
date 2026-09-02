@@ -21,20 +21,48 @@ jobs:
           - name: linux-x86_64 (gcc)
             os: ubuntu-24.04
             run-gui: true
+            fortran: true
           - name: linux-arm64 (gcc)
             os: ubuntu-24.04-arm
             run-gui: true
+            fortran: true
           - name: linux-x86_64 (clang)
             os: ubuntu-24.04
             apt-clang: true
             cmake-extra: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+            fortran: true
           - name: linux-x86_64 (intel icx)
             os: ubuntu-24.04
             intel: true
             cmake-extra: -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DCMAKE_Fortran_COMPILER=ifx
+            fortran: true
           - name: windows-x86_64 (mingw)
             os: windows-2022
             mingw: true
+            msystem: UCRT64
+            msys-packages: >-
+              mingw-w64-ucrt-x86_64-gcc
+              mingw-w64-ucrt-x86_64-gcc-fortran
+              mingw-w64-ucrt-x86_64-cmake
+              mingw-w64-ucrt-x86_64-ninja
+              mingw-w64-ucrt-x86_64-tcl
+              mingw-w64-ucrt-x86_64-tk
+            fortran: true
+          # Native arm64 Windows. MSYS2's arm64 environment packages Tcl, Tk,
+          # CMake and Ninja but no Fortran compiler at all, which is what made
+          # sico2elmer optional: ElmerPost itself is C, and requiring Fortran
+          # for it put the whole build out of reach of this architecture.
+          - name: windows-arm64 (clang, no fortran)
+            os: windows-11-arm
+            mingw: true
+            msystem: CLANGARM64
+            msys-packages: >-
+              mingw-w64-clang-aarch64-clang
+              mingw-w64-clang-aarch64-cmake
+              mingw-w64-clang-aarch64-ninja
+              mingw-w64-clang-aarch64-tcl
+              mingw-w64-clang-aarch64-tk
+            fortran: false
 
     steps:
       - uses: actions/checkout@v4
@@ -74,14 +102,8 @@ jobs:
         if: matrix.mingw
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-gcc-fortran
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-tcl
-            mingw-w64-ucrt-x86_64-tk
+          msystem: ${{ matrix.msystem }}
+          install: ${{ matrix.msys-packages }}
 
       - name: build
         if: '!matrix.mingw'
@@ -101,15 +123,25 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
 
-      - name: the binaries must exist
+      # sico2elmer is the only Fortran in the tree and is skipped where there is
+      # no Fortran compiler, so which binaries are expected depends on the job.
+      # Asserted both ways: a job with Fortran that produced no sico2elmer has
+      # silently lost it, and one without Fortran that produced it means the
+      # detection is not doing anything.
+      - name: the expected binaries must exist
         shell: bash
         run: |
           set -e
-          for b in ElmerPost sico2elmer; do
-            f=$(find build -name "$b" -type f -o -name "$b.exe" -type f | head -1)
-            echo "$b: ${f:-MISSING}"
-            [ -n "$f" ] || { echo "::error::$b was not built"; exit 1; }
-          done
+          ep=$(find build -name 'ElmerPost' -type f -o -name 'ElmerPost.exe' -type f | head -1)
+          s2e=$(find build -name 'sico2elmer' -type f -o -name 'sico2elmer.exe' -type f | head -1)
+          echo "ElmerPost : ${ep:-MISSING}"
+          echo "sico2elmer: ${s2e:-none}"
+          [ -n "$ep" ] || { echo "::error::ElmerPost was not built"; exit 1; }
+          if [ "${{ matrix.fortran }}" = "false" ]; then
+            [ -z "$s2e" ] || { echo "::error::sico2elmer was built on a job with no Fortran compiler"; exit 1; }
+          else
+            [ -n "$s2e" ] || { echo "::error::sico2elmer was not built despite a Fortran compiler"; exit 1; }
+          fi
 
       # MATC is a submodule rather than a copy. Assert that, because a stale
       # vendored copy is exactly the problem this replaces: the one that was

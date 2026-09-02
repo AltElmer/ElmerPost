@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-PROJECT(ElmerPost Fortran C CXX)
+# Fortran is detected below rather than required here. ElmerPost itself is C;
+# the only Fortran in the tree is src/sico2elmer/sico2elmer.f90, one file
+# belonging to sico2elmer, a separate converter that happens to live in the
+# same repository. Demanding a Fortran compiler for the post-processor put the
+# whole build out of reach of any toolchain without one, which includes
+# Windows on arm64: MSYS2's arm64 environment packages Tcl, Tk, CMake and
+# Ninja, and no Fortran compiler at all.
+PROJECT(ElmerPost C CXX)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_ROOT}/Modules "${PROJECT_SOURCE_DIR}/cmake/Modules" )
 
@@ -45,6 +52,16 @@ ENDIF()
 IF(NOT CMAKE_C_STANDARD)
   SET(CMAKE_C_STANDARD 99)
   SET(CMAKE_C_STANDARD_REQUIRED ON)
+ENDIF()
+
+INCLUDE(CheckLanguage)
+CHECK_LANGUAGE(Fortran)
+IF(CMAKE_Fortran_COMPILER)
+  ENABLE_LANGUAGE(Fortran)
+  SET(ELMERPOST_FORTRAN TRUE)
+ELSE()
+  SET(ELMERPOST_FORTRAN FALSE)
+  MESSAGE(STATUS "ElmerPost: no Fortran compiler found, sico2elmer will not be built")
 ENDIF()
 
 include(CheckIncludeFiles)
