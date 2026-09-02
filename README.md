@@ -43,11 +43,18 @@ A fifth is ordering rather than absence: the `IF(MINGW)` block sits after `ADD_S
 
 **Builds and links** on Linux with GCC, Clang and Intel `icx`/`ifx`, on x86_64 and arm64, and on Windows with MinGW-w64. Produces `ElmerPost` and `sico2elmer`.
 
-**Starts** on Windows: it resolves `ELMER_POST_HOME`, loads `tcl/init.tcl` and brings up its Tcl interpreter.
+**Starts** on both: it resolves `ELMER_POST_HOME`, loads `tcl/init.tcl` and brings up its Tcl interpreter.
 
-**Does not open its graphics window on Windows.** GLAUX's `CreateWindow` fails with `ERROR_INVALID_HANDLE` and the program shows a dialog reading *"create window failed"*. To be clear about whose problem this is, it was checked against upstream's own build from unmodified sources: the identical dialog. It is not a regression introduced here, and the cause is **not established** — the obvious candidate, an ANSI/wide mismatch between `RegisterClass` and `CreateWindow`, was tested and refuted, since `UNICODE` is not defined for that file and forcing the explicit `RegisterClassA`/`CreateWindowA` changes nothing.
+**Runs on Linux.** A CI job starts it under Xvfb and reads the X window tree back. It finds both windows:
 
-Linux is the platform whose GLX path was the one actually in use, so there is a CI job that runs ElmerPost under Xvfb and reports what it sees. It reports rather than enforces: the point is to find out whether this is Windows-only, and a job that failed the build would say less than one that prints the window tree.
+```
+0x400004 "ELMER POST PROCESSING"  200x200   the Tk interface
+0x200003 "ELMER POST GRAPHICS"    500x500   the OpenGL window
+```
+
+**Does not open its graphics window on Windows.** GLAUX's `CreateWindow` fails with `ERROR_INVALID_HANDLE` and the program shows a dialog reading *"create window failed"*. Two things were checked rather than assumed. It is not a regression introduced here: upstream's own build from unmodified sources shows the identical dialog. And it is Windows-only, which is what the Xvfb job above establishes — the same code opens both windows on X11.
+
+The cause is **not established**. The obvious candidate, an ANSI/wide mismatch between `RegisterClass` and `CreateWindow`, was tested and refuted: `UNICODE` is not defined for that file, and forcing the explicit `RegisterClassA` and `CreateWindowA` changes nothing. Those probes were reverted rather than shipped as a fix for something they do not fix.
 
 ## Building
 
