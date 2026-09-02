@@ -209,7 +209,7 @@ static void (*IdleFunc)(void)                    = NULL;
 static char     *lpszClassName = "tkLibWClass";
 static WCHAR    *lpszClassNameW = L"tkLibWClass";
 
-static long tkWndProc(HWND hWnd, UINT message, DWORD wParam, LONG lParam);
+static LRESULT CALLBACK tkWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 static unsigned char ComponentFromIndex(int i, int nbits, int shift );
 static void PrintMessage( const char *Format, ... );
 static PALETTEENTRY *FillRgbPaletteEntries( PIXELFORMATDESCRIPTOR *Pfd, PALETTEENTRY *Entries, UINT Count );
@@ -1012,8 +1012,8 @@ GLenum tkGetDisplayMode(void)
  *                                                                     *
  ***********************************************************************/
 
-static long
-tkWndProc(HWND hWnd, UINT message, DWORD wParam, LONG lParam)
+static LRESULT CALLBACK
+tkWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     int key;
     PAINTSTRUCT paint;
