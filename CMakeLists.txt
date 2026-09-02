@@ -6,7 +6,12 @@ cmake_minimum_required(VERSION 3.10)
 # whole build out of reach of any toolchain without one, which includes
 # Windows on arm64: MSYS2's arm64 environment packages Tcl, Tk, CMake and
 # Ninja, and no Fortran compiler at all.
-PROJECT(ElmerPost C CXX)
+#
+# ElmerPost had a version line of its own that stopped at 5.4.0, shipped with
+# Elmer 5.4 and recorded in that release's notes as "elmerpost 5.4.0". This
+# continues it rather than restarting at 1.0.0 and pretending the previous
+# thirty years did not happen.
+PROJECT(ElmerPost VERSION 5.5.0 LANGUAGES C CXX)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_ROOT}/Modules "${PROJECT_SOURCE_DIR}/cmake/Modules" )
 
