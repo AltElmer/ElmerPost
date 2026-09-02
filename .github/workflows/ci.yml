@@ -212,26 +212,32 @@ jobs:
         if: '!matrix.mingw'
         shell: bash
         run: |
+          # setvars.sh trips over set -u, so it is turned off around it and back
+          # on afterwards. That leaves set -u active for the rest of this step,
+          # which is why the macOS variables below are written with :- defaults:
+          # they are unset on every job except the macOS ones, and without the
+          # default the Intel job died with "MAC_TCLTK_ARGS: unbound variable"
+          # while every other Linux job, which never enables set -u, passed.
           if [ -f /opt/intel/oneapi/setvars.sh ]; then
             set +u; . /opt/intel/oneapi/setvars.sh; set -u
           fi
           echo "cmake: $(cmake --version | head -1)"
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake-extra }} $MAC_TCLTK_ARGS
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake-extra }} ${MAC_TCLTK_ARGS:-}
 
           # On macOS, prove the configure used the X11 Tcl/Tk built for this
           # job and not Apple's framework. Without this the job can succeed
           # having quietly linked the Aqua Tk, which is the thing the whole
           # XQuartz exercise exists to avoid, and nothing would say so.
-          if [ -n "$MAC_TCLTK_PREFIX" ]; then
+          if [ -n "${MAC_TCLTK_PREFIX:-}" ]; then
             used=$(grep -E '^(TCL|TK)_(LIBRARY|INCLUDE_PATH):' build/CMakeCache.txt || true)
             echo "$used"
             if echo "$used" | grep -qi 'framework'; then
               echo "::error::configure picked Apple's Tcl/Tk framework, not the X11 build"
               exit 1
             fi
-            echo "$used" | grep -q "$MAC_TCLTK_PREFIX" \
-              || { echo "::error::Tcl/Tk did not come from $MAC_TCLTK_PREFIX"; exit 1; }
-            echo "ok: using the X11 Tcl/Tk from $MAC_TCLTK_PREFIX"
+            echo "$used" | grep -q "${MAC_TCLTK_PREFIX:-}" \
+              || { echo "::error::Tcl/Tk did not come from ${MAC_TCLTK_PREFIX:-}"; exit 1; }
+            echo "ok: using the X11 Tcl/Tk from ${MAC_TCLTK_PREFIX:-}"
           fi
 
           cmake --build build
