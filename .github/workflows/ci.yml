@@ -72,14 +72,27 @@ jobs:
           # Both are obtainable: XQuartz supplies X11 and a GLX capable libGL,
           # and Tk builds against it with --enable-aqua=no. That is a cost in
           # build time rather than a reason the platform cannot work.
+          #
+          # The OpenGL variables are pointed at XQuartz on purpose. macOS has
+          # its own OpenGL framework and CMake's FindOpenGL prefers it, which
+          # gives <OpenGL/gl.h> and no <GL/gl.h>; ElmerPost and GLAUX include
+          # the latter, and the GLX calls need XQuartz's GL anyway.
           - name: macos-arm64 (clang, xquartz)
             os: macos-14
             macos-x11: true
             fortran: true
+            cmake-extra: >-
+              -DOPENGL_INCLUDE_DIR=/opt/X11/include
+              -DOPENGL_gl_LIBRARY=/opt/X11/lib/libGL.dylib
+              -DOPENGL_glu_LIBRARY=/opt/X11/lib/libGLU.dylib
           - name: macos-x86_64 (clang, xquartz)
             os: macos-15-intel
             macos-x11: true
             fortran: true
+            cmake-extra: >-
+              -DOPENGL_INCLUDE_DIR=/opt/X11/include
+              -DOPENGL_gl_LIBRARY=/opt/X11/lib/libGL.dylib
+              -DOPENGL_glu_LIBRARY=/opt/X11/lib/libGLU.dylib
 
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +153,13 @@ jobs:
           brew install gfortran || brew install gcc
           test -f /opt/X11/include/X11/Xlib.h || { echo "::error::XQuartz did not provide X11 headers"; exit 1; }
           ls /opt/X11/lib/libGL* || { echo "::error::XQuartz did not provide libGL"; exit 1; }
-          echo "XQuartz provides X11 and libGL"
+          # The GL headers as well as the library. macOS has its own OpenGL
+          # framework, which offers <OpenGL/gl.h> and not <GL/gl.h>; GLAUX and
+          # ElmerPost include the latter, so checking only for the library
+          # would have passed while the build still could not find a header.
+          test -f /opt/X11/include/GL/gl.h || { echo "::error::XQuartz did not provide GL/gl.h"; exit 1; }
+          test -f /opt/X11/include/GL/glx.h || { echo "::error::XQuartz did not provide GL/glx.h"; exit 1; }
+          echo "XQuartz provides X11, GL headers and libGL"
 
       - name: build an X11 Tcl/Tk (macos)
         if: matrix.macos-x11 && steps.tcltk-cache.outputs.cache-hit != 'true'
