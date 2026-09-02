@@ -143,11 +143,30 @@ INSTALL(FILES "tcl_license.terms" "tk_license.terms" DESTINATION "${ELMER_POST_D
 IF(MINGW)
   SET(MINGW32 TRUE CACHE BOOL "")
   MESSAGE(STATUS "MING32 detected")
-  MESSAGE(WARNING "Installing (tcl|tk)_include_path/../(bin|lib)/")
-  INSTALL(DIRECTORY "${TCL_INCLUDE_PATH}/../bin/" DESTINATION "bin")
-  INSTALL(DIRECTORY "${TCL_INCLUDE_PATH}/../lib/" DESTINATION "lib")
-  INSTALL(DIRECTORY "${TK_INCLUDE_PATH}/../bin/" DESTINATION "bin")
-  INSTALL(DIRECTORY "${TK_INCLUDE_PATH}/../lib/" DESTINATION "lib")
+  # Only the Tcl and Tk script libraries, which the interpreter loads at run
+  # time and which the DLLs alone do not provide.
+  #
+  # What used to be here installed four whole directories:
+  #
+  #   INSTALL(DIRECTORY "${TCL_INCLUDE_PATH}/../bin/" DESTINATION "bin")
+  #   INSTALL(DIRECTORY "${TCL_INCLUDE_PATH}/../lib/" DESTINATION "lib")
+  #   ... and the same two for TK
+  #
+  # TCL_INCLUDE_PATH is /ucrt64/include under MSYS2, so "../bin/" is the whole
+  # of /ucrt64/bin: the entire toolchain. A released archive built this way
+  # carried gcc, g++, gfortran, cc1, cmake, ctest, ninja, openssl and curl,
+  # 3504 files and 569 MB unpacked, to ship one 905 kB post-processor. The
+  # MESSAGE(WARNING) above it said what it was doing and nobody read it.
+  #
+  # The DLLs the binaries actually need are resolved with objdump in the
+  # release workflow, which copies those and nothing else.
+  FILE(GLOB TCLTK_SCRIPT_DIRS "${TCL_INCLUDE_PATH}/../lib/tcl[0-9]*" "${TCL_INCLUDE_PATH}/../lib/tk[0-9]*")
+  IF(TCLTK_SCRIPT_DIRS)
+    INSTALL(DIRECTORY ${TCLTK_SCRIPT_DIRS} DESTINATION "lib")
+  ELSE()
+    MESSAGE(WARNING "No Tcl/Tk script libraries found next to ${TCL_INCLUDE_PATH}; "
+                    "the installed ElmerPost will start and then fail to load init.tcl")
+  ENDIF()
 ENDIF(MINGW)
 
 
