@@ -215,7 +215,7 @@ jobs:
           pass=0
           while : ; do
             pass=$((pass+1))
-            before=$(ls "$d"/*.dll 2>/dev/null | wc -l)
+            before=$(find "$d" -maxdepth 1 -name '*.dll' | wc -l)
             for bin in "$d"/*.exe "$d"/*.dll; do
               [ -f "$bin" ] || continue
               objdump -p "$bin" | awk '/DLL Name:/ {print $3}' | while read -r dll; do
@@ -223,7 +223,7 @@ jobs:
                 cp -n "/${{ matrix.msys-prefix }}/bin/$dll" "$d/" 2>/dev/null || true
               done
             done
-            after=$(ls "$d"/*.dll 2>/dev/null | wc -l)
+            after=$(find "$d" -maxdepth 1 -name '*.dll' | wc -l)
             echo "pass $pass: $before -> $after DLLs"
             [ "$after" -gt "$before" ] || break
             [ "$pass" -lt 8 ] || break
