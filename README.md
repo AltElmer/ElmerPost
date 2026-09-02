@@ -20,7 +20,7 @@ Worth noting while comparing the two: the move also changed the mode of **635 fi
 
 ## 3. MATC is a submodule
 
-Upstream carries a copy of MATC's sources in `post/matc`. That copy is **twelve years behind**: 9,523 lines against 9,819, missing the OpenMP work, the locale fixes, the prototype cleanups and the `str.c` miscompilation workaround. 21 of its 22 source files differ from the maintained version.
+Upstream carries a copy of MATC's sources in `post/matc`. That copy is **twelve years behind**: 9,523 lines against 9,819, with **21 of its 22 source files differing** from the maintained version. It has 29 OpenMP markers in its sources where the maintained one has 37, and it lacks the `MATC_OPENMP` compile definition entirely, along with the locale fixes, the prototype cleanups and the `str.c` miscompilation workaround.
 
 It is now a submodule of [AltElmer/matc](https://github.com/AltElmer/matc), which is the same code with its history and its maintenance.
 

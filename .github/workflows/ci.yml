@@ -120,9 +120,16 @@ jobs:
         run: |
           set -e
           test -f matc/.git || test -d matc/.git || { echo "::error::matc is not a submodule checkout"; exit 1; }
-          grep -q 'MATC_OPENMP' matc/src/*.c matc/src/*.h 2>/dev/null \
-            || { echo "::error::matc does not look like the maintained one"; exit 1; }
-          echo "ok: matc is the submodule, and it is the maintained version"
+          grep -q 'AltElmer/matc' .gitmodules || { echo "::error::.gitmodules does not point at AltElmer/matc"; exit 1; }
+          # Files that exist in only one of the two trees, so this tells the
+          # maintained checkout from the old vendored copy without depending on
+          # a string that may or may not be in the sources. An earlier version
+          # of this step grepped for MATC_OPENMP in matc/src/*.c, which is not
+          # there in either copy: it lives in src/CMakeLists.txt. That check
+          # could only ever fail.
+          test -f matc/LGPL-2.1 || { echo "::error::matc/LGPL-2.1 missing; not the maintained checkout"; exit 1; }
+          test ! -f matc/matc.pro || { echo "::error::matc/matc.pro present; this is the old vendored copy"; exit 1; }
+          echo "ok: matc is the AltElmer/matc submodule, not the vendored copy"
 
   # Does ElmerPost actually open its window?
   #
