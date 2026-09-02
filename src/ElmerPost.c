@@ -1352,7 +1352,13 @@ Window tkXWindow()
     Window ptr = 0;
 
 #ifdef MINGW32
-    ptr = auxGetHWND();
+    /* tkXWindow() is declared to return X11's Window, an integer, and on
+       Windows it carries an HWND, a pointer. The two are the same width here
+       and the value round trips, but the conversion has to be written out:
+       GCC 14 turned -Wint-conversion into an error, so what used to be a
+       warning now stops the build. uintptr_t is the type that guarantees the
+       round trip. */
+    ptr = (Window)(uintptr_t)auxGetHWND();
 #else
     ptr = auxXWindow();
 #endif
@@ -1364,7 +1370,7 @@ Window tkXWindow()
 static int ActivateGraphicsWindow( ClientData cl,Tcl_Interp *interp,int argc,char **argv )
 {
 #ifdef MINGW32
-    ShowWindow( tkXWindow(), SW_SHOWNORMAL );
+    ShowWindow( (HWND)(uintptr_t)tkXWindow(), SW_SHOWNORMAL );
 #endif
     return TCL_OK;
 }
