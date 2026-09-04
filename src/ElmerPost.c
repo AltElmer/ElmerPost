@@ -1211,14 +1211,14 @@ static int MathCommand(ClientData cl,Tcl_Interp *interp,int argc,char **argv)
     /*
     *   if empty list return.
     */
-    if ( listheaders[VARIABLES].next == (LIST *)NULL )
+    if ( LISTHEADERS[VARIABLES].next == (LIST *)NULL )
     {
       Tcl_SetResult( interp, result, TCL_STATIC );
       return TCL_OK;
     }
 
     i = j = k = 0;
-    for( lst = listheaders[VARIABLES].next; lst; lst = NEXT(lst))
+    for( lst = LISTHEADERS[VARIABLES].next; lst; lst = NEXT(lst))
     {
       var = (VARIABLE *)lst;
       if ( !NAME(var)) continue;
